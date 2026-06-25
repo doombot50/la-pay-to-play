@@ -105,8 +105,14 @@ def _meta_for(don: pd.DataFrame, donors: pd.DataFrame, donor_ids: set) -> dict:
     sub = don[don["entity_key"].isin(wanted_keys)]
     meta: dict[str, dict] = {}
     for ekey, grp in sub.groupby("entity_key"):
+        office_totals = {
+            o: float(grp.loc[grp["recipient_office"] == o, "amount"].sum())
+            for o in grp["recipient_office"].unique()
+            if o and o.strip()
+        }
         meta[_entity_id("D", ekey)] = {
             "donation_total": float(grp["amount"].sum()),
+            "office_totals": office_totals,
             "donation_dates": [d.date() for d in grp["_date"].dropna()],
             "offices": sorted({o for o in grp["recipient_office"] if o.strip()}),
         }

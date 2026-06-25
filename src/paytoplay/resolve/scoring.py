@@ -113,10 +113,11 @@ def score_links(
 
         best = None
         best_office = ""
+        office_totals = donor.get("office_totals", {})
         for office in donor["offices"] or [""]:
             scored = score_relationship(
                 contract_total=contract_total,
-                donation_total=donor["donation_total"],
+                donation_total=office_totals.get(office, donor["donation_total"]),
                 confidence=float(link["confidence"]),
                 agency=agency,
                 recipient_office=office,
@@ -132,7 +133,7 @@ def score_links(
                 "vendor_id": link["vendor_id"],
                 "donor_id": link["donor_id"],
                 "contract_total": contract_total,
-                "donation_total": donor["donation_total"],
+                "donation_total": office_totals.get(best_office, donor["donation_total"]),
                 "concern_score": best["score"],
                 **best["components"],
                 # Only name an office when it actually controls the agency; a 0
