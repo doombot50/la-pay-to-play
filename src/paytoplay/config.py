@@ -20,10 +20,17 @@ AGENCY_MAP_PATH = CONFIG / "agency_officials.yml"
 # --- Resolution / scoring thresholds (tune as you validate) -----------------
 # Minimum fuzzy score (0-100) for a pair to even be considered a candidate link.
 MATCH_MIN_SCORE = 82
-# At/above this confidence (0-1) a link is auto-published; between MIN and this
-# it goes to the human-review queue.
-PUBLISH_CONFIDENCE = 0.80
+# Auto-publish bar. This is a reputationally-sensitive tool, so the public site
+# only shows strong, defensible matches: an org<->org name match at/above this
+# confidence (or an eponymous org<->person match). Everything from
+# REVIEW_CONFIDENCE up to here is kept as status="review" and never published.
+PUBLISH_CONFIDENCE = 0.92
 REVIEW_CONFIDENCE = 0.55
+# Materiality gate (enforced when building the public site): both sides must
+# clear these or the link is held back — a tiny donation next to a tiny contract
+# is noise, not a pay-to-play signal.
+MIN_CONTRACT_USD = 5_000
+MIN_DONATION_USD = 500
 # Donations within this many days of a contract award get the timing bonus.
 TIMING_WINDOW_DAYS = 365
 

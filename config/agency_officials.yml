@@ -1,68 +1,79 @@
-# Maps an awarding agency (as it appears in LaTrac) to the statewide official,
-# board, or commission that controls its contracts. This is what turns
+# Maps an awarding agency (as it appears in the Act 87 contract reports) to the
+# statewide elected official(s) who control its contracts. This is what turns
 # "a payment from agency X" into "money the people a donor gave to can steer."
 #
-# control: "direct"  -> the official directly awards/approves these contracts
-#          "board"   -> a board the official appoints/chairs controls them
-#          "budget"  -> the official influences via budget/appropriations
+# control: "direct"  -> the elected official heads/controls this agency directly
+#          "budget"  -> the official (the Governor) controls it via appointment
+#                       and the executive budget
 #
 # IMPORTANT: each `office` MUST match, case-insensitively, the recipient_office
-# strings emitted by the CF export (which come from SoS election data — elected
-# offices only). Appointed posts like "Commissioner of Administration" never
-# appear as a donation recipient_office, so mapping to them can never fire.
-# Verified office strings present in the data are used below.
+# strings the CF donation export emits (from SoS election data — ELECTED offices
+# only). Appointed posts (e.g. Commissioner of Administration, agency
+# secretaries) never appear as a donation office, so executive agencies are
+# mapped to the Governor (budget). The strongest, cleanest signal is the
+# constitutional officers who head their own department, and the Lieutenant
+# Governor, who constitutionally heads Culture, Recreation & Tourism.
 #
-# Start with the highest-spend agencies and expand. Names (and aliases) must
-# match the `awarding_agency` values produced by ingest/contracts_latrac.py.
+# `agency` / `aliases` must match the awarding_agency values from
+# ingest/contracts_act87.py (see `python tools/list_agencies.py`).
+
+_gov: &gov
+  - { name: "Governor", office: "Governor", control: "budget" }
 
 agencies:
+  # ── direct control by a constitutional officer (high-signal) ────────────
+  - agency: "Department of Culture, Recreation, and Tourism"
+    aliases: ["Culture, Recreation, and Tourism", "CRT", "Culture Recreation and Tourism"]
+    officials:
+      - { name: "Lieutenant Governor", office: "Lieutenant Governor", control: "direct" }
+
+  - agency: "Commissioner of Insurance"
+    aliases: ["Department of Insurance", "LDI"]
+    officials:
+      - { name: "Commissioner of Insurance", office: "Commissioner of -- Insurance", control: "direct" }
+
   - agency: "Department of Justice"
     aliases: ["DOJ", "Attorney General's Office", "Louisiana Department of Justice"]
     officials:
-      - name: "Attorney General"
-        office: "Attorney General"
-        control: "direct"
+      - { name: "Attorney General", office: "Attorney General", control: "direct" }
 
   - agency: "Department of the Treasury"
     aliases: ["State Treasury", "Treasury", "Bond Commission"]
     officials:
-      - name: "State Treasurer"
-        office: "Treasurer"
-        control: "direct"
-
-  - agency: "Department of Insurance"
-    aliases: ["LDI"]
-    officials:
-      - name: "Commissioner of Insurance"
-        office: "Commissioner of -- Insurance"
-        control: "direct"
+      - { name: "State Treasurer", office: "Treasurer", control: "direct" }
 
   - agency: "Department of Agriculture and Forestry"
     aliases: ["LDAF", "Agriculture and Forestry"]
     officials:
-      - name: "Commissioner of Agriculture"
-        office: "Commissioner of -- Agriculture and Forestry"
-        control: "direct"
-      - name: "Commissioner of Agriculture"
-        office: "Agriculture Commissioner"
-        control: "direct"
+      - { name: "Commissioner of Agriculture", office: "Commissioner of -- Agriculture and Forestry", control: "direct" }
+      - { name: "Commissioner of Agriculture", office: "Agriculture Commissioner", control: "direct" }
 
-  - agency: "Secretary of State"
-    aliases: ["SoS", "Elections"]
+  - agency: "Department of State"
+    aliases: ["Secretary of State", "Elections"]
     officials:
-      - name: "Secretary of State"
-        office: "Secretary of State"
-        control: "direct"
+      - { name: "Secretary of State", office: "Secretary of State", control: "direct" }
 
-  - agency: "Division of Administration"
-    aliases: ["DOA", "Office of the Governor", "Executive Department"]
-    officials:
-      - name: "Governor"
-        office: "Governor"
-        control: "budget"
-      - name: "Lieutenant Governor"
-        office: "Lieutenant Governor"
-        control: "budget"
+  # ── Governor-controlled executive agencies (budget; biggest contract spend)
+  - { agency: "Louisiana Department of Health", aliases: ["LDH", "Department of Health"], officials: *gov }
+  - { agency: "Office of Group Benefits", officials: *gov }
+  - { agency: "Louisiana Workforce Commission", aliases: ["LWC"], officials: *gov }
+  - { agency: "Coastal Protection and Restoration Authority", aliases: ["CPRA"], officials: *gov }
+  - { agency: "Office of Technology Services", aliases: ["OTS"], officials: *gov }
+  - { agency: "Department of Education", aliases: ["LDOE", "DOE"], officials: *gov }
+  - { agency: "Department of Children and Family Services", aliases: ["DCFS"], officials: *gov }
+  - { agency: "Office of Juvenile Justice", aliases: ["OJJ"], officials: *gov }
+  - { agency: "Corrections Services", officials: *gov }
+  - { agency: "Public Safety Services", officials: *gov }
+  - { agency: "Governor's Office of Homeland Security and Emergency Preparedness", aliases: ["GOHSEP"], officials: *gov }
+  - { agency: "Office of Risk Management", officials: *gov }
+  - { agency: "Department of Wildlife and Fisheries", aliases: ["LDWF"], officials: *gov }
+  - { agency: "Department of Transportation and Development", aliases: ["DOTD"], officials: *gov }
+  - { agency: "Department of Environmental Quality", aliases: ["DEQ"], officials: *gov }
+  - { agency: "Department of Natural Resources", aliases: ["DNR", "Department of Energy and Natural Resources"], officials: *gov }
+  - { agency: "Division of Administration", aliases: ["DOA", "Office of the Governor", "Executive Department"], officials: *gov }
+  - { agency: "Department of Veterans Affairs", officials: *gov }
+  - { agency: "Department of Economic Development", aliases: ["LED"], officials: *gov }
+  - { agency: "Department of Revenue", aliases: ["LDR"], officials: *gov }
 
-# TODO: extend with the top ~30 agencies by total contract spend once real
-# LaTrac data is ingested. Pull the agency list from data/raw/contracts.parquet.
+# Note: university systems (LSU/UL/Southern) and many boards are also
+# Governor-appointed; add them as *gov here if their contract spend warrants it.

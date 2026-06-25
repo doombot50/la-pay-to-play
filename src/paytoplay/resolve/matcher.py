@@ -25,6 +25,16 @@ def _name_similarity(a: str, b: str) -> float:
     return fuzz.token_set_ratio(ka, kb) / 100.0
 
 
+def _eponymous(vendor_name: str, person_name: str) -> bool:
+    """True when a person donor's full name is embedded in the vendor name —
+    e.g. donor 'Gordon McKernan' in vendor 'Gordon McKernan Injury Attorneys'.
+    This is the only org<->person link we trust enough to publish, because we
+    have no employer field to tie a person to a company they merely work for."""
+    ptoks = [t for t in names.clean(person_name).split() if len(t) > 1]
+    vtoks = set(names.clean(vendor_name).split())
+    return len(ptoks) >= 2 and all(t in vtoks for t in ptoks)
+
+
 def _lane_and_confidence(vendor: dict, donor: dict) -> tuple[str, float]:
     name_sim = _name_similarity(vendor["name"], donor["name"])
     employer_sim = _name_similarity(vendor["name"], donor.get("employer") or "")
@@ -67,13 +77,19 @@ def build_links(
         lane, conf = _lane_and_confidence(vendor, donor)
         if lane == "none" or conf < REVIEW_CONFIDENCE:
             continue
+        # Publish policy (see config): only strong org<->org name matches, or an
+        # eponymous org<->person match, go public. Everything else is review-only.
+        publishable = (
+            (lane == "org_org" and conf >= PUBLISH_CONFIDENCE)
+            or (lane == "org_person" and _eponymous(vendor["name"], donor["name"]))
+        )
         rows.append(
             {
                 "vendor_id": v_id,
                 "donor_id": d_id,
                 "lane": lane,
                 "confidence": conf,
-                "status": "published" if conf >= PUBLISH_CONFIDENCE else "review",
+                "status": "published" if publishable else "review",
             }
         )
     return pd.DataFrame(

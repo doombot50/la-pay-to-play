@@ -48,20 +48,21 @@ python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\act
 make install                                        # deps + editable install
 
 # 1. Export donations from the CF repo (la-cf-tool), stdlib-only, into this repo:
-#    python build_p2p_export.py --since 2016 \
+#    python build_p2p_export.py --since 2015 \
 #        --out /path/to/la-pay-to-play/data/external/cf_donations.csv
 # 2. Normalize that export -> data/external/donations.parquet
 python -m paytoplay.ingest.cf_import
 
-# 3. Contracts. Real LaTrac ingest is still a stub, so for an end-to-end demo:
-make sample-contracts        # SAMPLE data: real vendor names, synthetic $/dates
-#    (replace with: python -m paytoplay.ingest.contracts_latrac <export.xlsx>)
+# 3. Ingest real state contracts (Act 87 monthly reports, parsed with pdfplumber):
+make contracts               # -> data/raw/contracts.parquet  (downloads + caches PDFs)
 
 # 4. Resolve + score + load -> data/processed/paytoplay.db
 make pipeline
 
-# 5. Serve the API
-make serve   # http://localhost:8000/docs
+# 5. Build the static site JSON, then serve it
+make build-site              # -> web/data/*.json (published-only)
+make serve-static            # http://localhost:8000   (leaderboard-first SPA)
+# (or `make serve` for the local FastAPI dev API)
 ```
 
 > **CF data reality:** the LA Ethics *contributions* export carries no employer,
@@ -75,23 +76,31 @@ make serve   # http://localhost:8000/docs
 
 | Source | What | Access |
 |---|---|---|
-| LaTrac / LA Checkbook | State vendor payments + PPCS contracts | https://checkbook.la.gov , https://wwwprd.doa.louisiana.gov/latrac/portal.cfm |
-| LA Ethics Administration | Campaign-finance donations | already scraped by **la-cf-tool**; consumed here as flat files |
-| Agency → official map | Which official/board controls each awarding agency | hand-curated, `config/agency_officials.yml` |
+| Act 87 of 2015 reports | Monthly state contract awards (vendor, $, agency, dates) | `checkbook.la.gov/Reports/Act87/YYYY_MM_Act87Report.pdf` — parsed by `ingest/contracts_act87.py` |
+| LA Ethics Administration | Campaign-finance donations | scraped by **la-cf-tool**; consumed here as a flat `cf_donations.csv` |
+| Agency → official map | Which elected official controls each awarding agency | hand-curated, `config/agency_officials.yml` |
 
 ## Status
 
-Runs end-to-end on **real LA donations** (2016+) joined to a **sample** contracts
-fixture. Real and wired: the CF export bridge (`build_p2p_export.py` in the CF
-repo), `cf_import`, name/address normalization (nickname + honorific folding
-vendored from the CF tool), donor-entity aggregation, blocking, matching,
-concern scoring, SQLite load, and the FastAPI read layer.
+Runs end-to-end on **real Louisiana data**: ~10.7k state contracts (Act 87,
+2022+) joined to ~169k donor entities from the CF export, served as a static
+**leaderboard-first** site (`web/`, GitHub Pages) backed by precomputed JSON.
 
-Still ahead (the genuinely novel work):
-- **Real contracts ingest** — `ingest/contracts_latrac.py` against LaTrac/Checkbook
-  exports (currently a sample fixture from `tools/make_sample_contracts.py`).
-- **Agency→official map** — expand `config/agency_officials.yml` to the top ~30
-  spend agencies (offices must match the SoS office strings the export emits).
-- **Frontend** — reuse the CF tool's styling for vendor/official profiles.
+Real and wired: the CF export bridge (`build_p2p_export.py` in the CF repo),
+`cf_import`, `ingest/contracts_act87.py`, name normalization (nickname +
+honorific folding vendored from the CF tool), donor-entity aggregation, blocking,
+matching with a tightened publish policy, concern scoring (records the
+controlling office), SQLite load, `build_site.py` static artifacts, and the
+`web/` SPA. A FastAPI read layer remains for local/dev.
 
-See `docs/ARCHITECTURE.md` for the full design and the build phases.
+**Reputational firewall:** only strong org↔org matches (confidence ≥ 0.92) with
+material money on both sides are published; everything else is review-only and
+never reaches the site. Matching is **name-based** (the Ethics export has no
+employer/address; contract reports have no vendor address), so the person lane
+only fires for eponymous vendors. Recipient office is backfilled by filer number
+(~27% coverage; statewide constitutional officers are well covered).
+
+Still ahead: LaTrac vendor *payments* (realized $) as a second ingest; LA SoS
+business filings (vendor→owner) to recover the person lane; Pages + DNS go-live.
+
+See `docs/ARCHITECTURE.md` for the full design.

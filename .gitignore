@@ -14,6 +14,9 @@ data/processed/*
 !data/external/.gitkeep
 !data/processed/.gitkeep
 
+# Generated static site data (built by paytoplay.build_site); web/ source is tracked
+web/data/
+
 # Local
 .env
 .DS_Store

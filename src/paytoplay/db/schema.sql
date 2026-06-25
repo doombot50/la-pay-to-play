@@ -61,6 +61,8 @@ CREATE TABLE links (
     control_weight   REAL,
     timing_weight    REAL,
     match_confidence REAL,
+    control_office   TEXT,           -- office that drove the control weight
+    agency           TEXT,           -- vendor's awarding agency (modal)
     PRIMARY KEY (vendor_id, donor_id)
 );
 

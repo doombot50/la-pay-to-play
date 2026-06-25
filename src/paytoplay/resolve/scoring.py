@@ -108,9 +108,11 @@ def score_links(
             continue
         contract_total = float(cv["amount"].sum())
         agency = cv["awarding_agency"].mode().iat[0] if not cv.empty else ""
-        award_dates = list(pd.to_datetime(cv["award_date"]).dt.date)
+        award_dates = [d for d in pd.to_datetime(cv["award_date"], errors="coerce").dt.date
+                       if pd.notna(d)]
 
         best = None
+        best_office = ""
         for office in donor["offices"] or [""]:
             scored = score_relationship(
                 contract_total=contract_total,
@@ -123,7 +125,7 @@ def score_links(
                 agency_map=agency_map,
             )
             if best is None or scored["score"] > best["score"]:
-                best = scored
+                best, best_office = scored, office
 
         out.append(
             {
@@ -133,6 +135,10 @@ def score_links(
                 "donation_total": donor["donation_total"],
                 "concern_score": best["score"],
                 **best["components"],
+                # Only name an office when it actually controls the agency; a 0
+                # control weight means no real relationship — don't fabricate one.
+                "control_office": best_office if best["components"]["control_weight"] > 0 else "",
+                "agency": agency,
                 "confidence": link["confidence"],
                 "status": link["status"],
             }

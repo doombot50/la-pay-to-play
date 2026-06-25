@@ -36,15 +36,23 @@ def _first_nonempty_by(don: pd.DataFrame, col: str) -> pd.Series:
 
 
 def _prep_vendors(contracts: pd.DataFrame) -> pd.DataFrame:
-    """Collapse contracts to one row per vendor, with normalized match columns."""
-    agg = contracts.groupby("vendor_name").agg(
+    """Collapse contracts to one row per vendor ENTITY, merging name variants
+    ("Berrigan Litchfield LLC" / "Berrigan, Litchfield LLC") via the normalized
+    name key, with a representative display name."""
+    c = contracts.copy()
+    c["_key"] = c["vendor_name"].map(names.name_key)
+    c = c[c["_key"].str.len() > 0]
+    agg = c.groupby("_key").agg(
         contract_total=("amount", "sum"),
         contract_count=("amount", "size"),
         address=("vendor_address", "first"),
     ).reset_index()
-    agg = agg.rename(columns={"vendor_name": "name"})
-    # vendor_name is unique per group, so a hash of it is a unique, stable id.
-    agg["id"] = agg["name"].map(lambda n: _entity_id("V", n))
+    # display name = most frequent raw vendor_name within the key
+    disp = (c.groupby(["_key", "vendor_name"]).size().reset_index(name="n")
+              .sort_values("n").drop_duplicates("_key", keep="last")
+              .set_index("_key")["vendor_name"])
+    agg["name"] = agg["_key"].map(disp)
+    agg["id"] = agg["_key"].map(lambda k: _entity_id("V", k))
     agg["name_tokens"] = agg["name"].map(names.tokens)
     agg["addr_block"] = agg["address"].map(addresses.block_key)
     return agg
@@ -123,9 +131,10 @@ def run() -> None:
     donors, donor_rows = _prep_donors(donations)
     print(f"resolved {len(vendors):,} vendors, {len(donors):,} donor entities")
 
-    # map contracts to vendor ids for downstream scoring
-    vid = vendors.set_index("name")["id"]
-    contracts = contracts.assign(vendor_id=contracts["vendor_name"].map(vid))
+    # map contracts to vendor ids (by normalized name key) for downstream scoring
+    key2id = dict(zip(vendors["_key"], vendors["id"]))
+    contracts = contracts.assign(
+        vendor_id=contracts["vendor_name"].map(names.name_key).map(key2id))
 
     pairs = blocking.candidate_pairs(vendors, donors)
     print(f"blocked to {len(pairs):,} candidate pairs")

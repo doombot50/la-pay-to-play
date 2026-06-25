@@ -1,0 +1,58 @@
+name: deploy-pages
+
+# Build the static pay-to-play site and publish it to GitHub Pages.
+# Data flow: pull the CF donations export (published by the la-campaign-finance
+# repo) -> normalize -> ingest Act 87 contracts -> resolve/score -> build_site.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 8 * * 1"        # Mondays 08:00 UTC
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt && pip install -e .
+
+      # Donations: published by the CF repo as a release asset (the flat-file
+      # handoff). Public asset, no auth needed.
+      - name: Fetch CF donations export
+        run: |
+          set -e
+          curl -fsSL -o data/external/cf_donations.csv.gz \
+            https://github.com/doombot50/la-campaign-finance/releases/download/data-cache/cf_donations.csv.gz
+          gunzip -f data/external/cf_donations.csv.gz
+          python -m paytoplay.ingest.cf_import
+
+      - name: Ingest Act 87 contracts
+        run: python -m paytoplay.ingest.contracts_act87 --since 2022
+
+      - name: Resolve, score, build site
+        run: |
+          python -m paytoplay.pipeline
+          python -m paytoplay.build_site
+          echo "p2p.charliestephens.xyz" > web/CNAME
+          touch web/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deploy
+        uses: actions/deploy-pages@v4
