@@ -15,13 +15,31 @@ def test_tokens_drop_corporate_filler():
 
 def test_looks_like_person():
     assert names.looks_like_person("John Smith")
+    assert names.looks_like_person("Mr. John Smith")          # honorific ignored
     assert not names.looks_like_person("Smith Engineering LLC")
+
+
+def test_person_key_folds_nicknames_and_honorifics():
+    assert names.person_key("Bob Smith") == names.person_key("Robert Smith")
+    assert names.person_key("Mr. Robert Smith") == names.person_key("Smith, Robert")
+
+
+def test_entity_key_collapses_person_variants():
+    # 'Bob'/'Robert' fold to one donor entity; an org keeps its corporate key
+    assert names.entity_key("Bob Jindal") == names.entity_key("Robert Jindal")
+    assert names.entity_key("Acme Holdings LLC") == names.name_key("Acme Holdings LLC")
 
 
 def test_address_block_key():
     key = addresses.block_key("123 Main Street, Baton Rouge, LA 70801")
     assert key.startswith("123")
     assert "70801" in key
+
+
+def test_address_block_key_requires_street_number():
+    # city/state/zip only (the LA Ethics shape) -> no block, no zip-only collisions
+    assert addresses.block_key("Baton Rouge, LA 70801") == ""
+    assert addresses.block_key("") == ""
 
 
 def test_money_weight_requires_both_sides():

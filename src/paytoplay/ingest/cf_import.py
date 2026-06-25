@@ -6,15 +6,17 @@ la-cf-tool stays the upstream owner of the LA Ethics scrape. It drops flat files
 
     id               str
     donor_name       str
-    employer         str    (occupation/employer if present, else "")
-    donor_address    str
+    employer         str    (always "" — not in the LA Ethics contributions export)
+    donor_address    str    "<city>, <state> <zip>" — no street line upstream
     amount           float
     date             date   (ISO)
     recipient_name   str    the candidate/committee that received it
+    recipient_filer  str    Ethics FilerNumber — collision-free recipient identity
     recipient_office str    office sought — used by the agency->official map
     source_url       str    link back to the filing
 
-Point CF_EXPORT_GLOB at whatever the CF tool emits.
+The CF repo's build_p2p_export.py emits exactly these columns as cf_donations.csv,
+so COLUMN_MAP is empty by default. Point CF_EXPORT_GLOB at that file.
 """
 from __future__ import annotations
 
@@ -27,7 +29,7 @@ from ..config import DONATIONS_PARQUET, EXTERNAL, ensure_dirs
 
 DONATIONS_SCHEMA = [
     "id", "donor_name", "employer", "donor_address", "amount",
-    "date", "recipient_name", "recipient_office", "source_url",
+    "date", "recipient_name", "recipient_filer", "recipient_office", "source_url",
 ]
 
 # Adjust to the CF tool's actual export filename(s).

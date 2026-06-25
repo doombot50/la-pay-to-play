@@ -6,33 +6,63 @@
 #          "board"   -> a board the official appoints/chairs controls them
 #          "budget"  -> the official influences via budget/appropriations
 #
-# Start with the highest-spend agencies and expand. Names must match the
-# `awarding_agency` values produced by ingest/contracts_latrac.py.
+# IMPORTANT: each `office` MUST match, case-insensitively, the recipient_office
+# strings emitted by the CF export (which come from SoS election data — elected
+# offices only). Appointed posts like "Commissioner of Administration" never
+# appear as a donation recipient_office, so mapping to them can never fire.
+# Verified office strings present in the data are used below.
+#
+# Start with the highest-spend agencies and expand. Names (and aliases) must
+# match the `awarding_agency` values produced by ingest/contracts_latrac.py.
 
 agencies:
-  - agency: "Department of Transportation and Development"
-    aliases: ["DOTD", "Transportation and Development"]
+  - agency: "Department of Justice"
+    aliases: ["DOJ", "Attorney General's Office", "Louisiana Department of Justice"]
     officials:
-      - name: "Governor"
-        office: "Governor of Louisiana"
-        control: "budget"
+      - name: "Attorney General"
+        office: "Attorney General"
+        control: "direct"
+
+  - agency: "Department of the Treasury"
+    aliases: ["State Treasury", "Treasury", "Bond Commission"]
+    officials:
+      - name: "State Treasurer"
+        office: "Treasurer"
+        control: "direct"
+
+  - agency: "Department of Insurance"
+    aliases: ["LDI"]
+    officials:
+      - name: "Commissioner of Insurance"
+        office: "Commissioner of -- Insurance"
+        control: "direct"
+
+  - agency: "Department of Agriculture and Forestry"
+    aliases: ["LDAF", "Agriculture and Forestry"]
+    officials:
+      - name: "Commissioner of Agriculture"
+        office: "Commissioner of -- Agriculture and Forestry"
+        control: "direct"
+      - name: "Commissioner of Agriculture"
+        office: "Agriculture Commissioner"
+        control: "direct"
+
+  - agency: "Secretary of State"
+    aliases: ["SoS", "Elections"]
+    officials:
+      - name: "Secretary of State"
+        office: "Secretary of State"
+        control: "direct"
 
   - agency: "Division of Administration"
-    aliases: ["DOA"]
-    officials:
-      - name: "Commissioner of Administration"
-        office: "Commissioner of Administration"
-        control: "direct"
-      - name: "Governor"
-        office: "Governor of Louisiana"
-        control: "budget"
-
-  - agency: "Department of Health"
-    aliases: ["LDH", "Health and Hospitals", "DHH"]
+    aliases: ["DOA", "Office of the Governor", "Executive Department"]
     officials:
       - name: "Governor"
-        office: "Governor of Louisiana"
+        office: "Governor"
+        control: "budget"
+      - name: "Lieutenant Governor"
+        office: "Lieutenant Governor"
         control: "budget"
 
-# TODO: extend with the top ~30 agencies by total contract spend.
-# Pull the agency list from data/raw/contracts.parquet after first ingest.
+# TODO: extend with the top ~30 agencies by total contract spend once real
+# LaTrac data is ingested. Pull the agency list from data/raw/contracts.parquet.

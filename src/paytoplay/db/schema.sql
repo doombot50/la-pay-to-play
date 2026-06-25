@@ -28,16 +28,21 @@ CREATE TABLE contracts (
     record_type      TEXT
 );
 
+-- One row per resolved DONOR ENTITY (gifts aggregated by entity_key), not per
+-- individual contribution. links.donor_id references donations.id.
 DROP TABLE IF EXISTS donations;
 CREATE TABLE donations (
     id                TEXT PRIMARY KEY,
     donor_name        TEXT,
     employer          TEXT,
     donor_address     TEXT,
-    amount            REAL,
-    date              TEXT,
-    recipient_name    TEXT,
-    recipient_office  TEXT,
+    donation_total    REAL,
+    donation_count    INTEGER,
+    date_first        TEXT,
+    date_last         TEXT,
+    recipient_name    TEXT,    -- most frequent recipient (display)
+    recipient_filer   TEXT,
+    recipient_office  TEXT,    -- most frequent non-empty office (display)
     source_url        TEXT
 );
 

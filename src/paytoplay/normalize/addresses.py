@@ -56,16 +56,23 @@ def normalize(addr: str | None) -> str:
 
 
 def block_key(addr: str | None) -> str:
-    """A coarse key for blocking: '<street-number> <zip5>'. Empty if unusable."""
+    """A coarse key for blocking: '<street-number> <zip5>'. Empty if unusable.
+
+    A street number is REQUIRED: the LA Ethics contributions export carries no
+    street line (only city/state/zip), so without this guard every donor would
+    collapse to a zip-only key and produce spurious 'address collision' matches
+    against any vendor in the same zip. No street number -> no address block.
+    """
     norm = normalize(addr)
     if not norm:
         return ""
     parts = norm.split()
     number = parts[0] if parts and parts[0].isdigit() else ""
+    if not number:
+        return ""
     zip5 = ""
     for p in reversed(parts):
         if p.isdigit() and len(p) == 5:
             zip5 = p
             break
-    key = f"{number} {zip5}".strip()
-    return key
+    return f"{number} {zip5}".strip()

@@ -44,19 +44,32 @@ Pipeline stages (see `src/paytoplay/pipeline.py`):
 ## Quick start
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+make install                                        # deps + editable install
 
-# 1. Drop CF donor exports into data/external/ (CSV/JSON/Parquet from la-cf-tool)
-# 2. Pull contracts (see TODOs in ingest/contracts_latrac.py)
-make ingest
+# 1. Export donations from the CF repo (la-cf-tool), stdlib-only, into this repo:
+#    python build_p2p_export.py --since 2016 \
+#        --out /path/to/la-pay-to-play/data/external/cf_donations.csv
+# 2. Normalize that export -> data/external/donations.parquet
+python -m paytoplay.ingest.cf_import
 
-# 3. Run the full pipeline -> data/processed/paytoplay.db
+# 3. Contracts. Real LaTrac ingest is still a stub, so for an end-to-end demo:
+make sample-contracts        # SAMPLE data: real vendor names, synthetic $/dates
+#    (replace with: python -m paytoplay.ingest.contracts_latrac <export.xlsx>)
+
+# 4. Resolve + score + load -> data/processed/paytoplay.db
 make pipeline
 
-# 4. Serve the API
+# 5. Serve the API
 make serve   # http://localhost:8000/docs
 ```
+
+> **CF data reality:** the LA Ethics *contributions* export carries no employer,
+> no street address, and no office on the contribution row. So the employer-based
+> person lane and the street-address lane can't fire from this data; matching is
+> name-based, and recipient office is backfilled by filer number from SoS data
+> (`build_p2p_export.py`). Bringing in LA SoS business filings (vendor → owner)
+> is the highest-value way to recover the person lane later.
 
 ## Data sources
 
@@ -68,8 +81,17 @@ make serve   # http://localhost:8000/docs
 
 ## Status
 
-Scaffold. Real logic lives in `normalize/`, `resolve/`, and `resolve/scoring.py`.
-The LaTrac ingest and CF import are stubbed with the exact shape they must produce —
-fill them against the live portal and your CF export schema.
+Runs end-to-end on **real LA donations** (2016+) joined to a **sample** contracts
+fixture. Real and wired: the CF export bridge (`build_p2p_export.py` in the CF
+repo), `cf_import`, name/address normalization (nickname + honorific folding
+vendored from the CF tool), donor-entity aggregation, blocking, matching,
+concern scoring, SQLite load, and the FastAPI read layer.
+
+Still ahead (the genuinely novel work):
+- **Real contracts ingest** — `ingest/contracts_latrac.py` against LaTrac/Checkbook
+  exports (currently a sample fixture from `tools/make_sample_contracts.py`).
+- **Agency→official map** — expand `config/agency_officials.yml` to the top ~30
+  spend agencies (offices must match the SoS office strings the export emits).
+- **Frontend** — reuse the CF tool's styling for vendor/official profiles.
 
 See `docs/ARCHITECTURE.md` for the full design and the build phases.

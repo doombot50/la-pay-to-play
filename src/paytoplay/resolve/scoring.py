@@ -78,47 +78,61 @@ def score_relationship(
 def score_links(
     links: pd.DataFrame,
     contracts: pd.DataFrame,
-    donations: pd.DataFrame,
+    donors: dict,
     agency_map: dict | None = None,
 ) -> pd.DataFrame:
     """Aggregate money per link and attach a concern score to each.
 
     Expects:
-      links: vendor_id, donor_id, confidence, status
+      links:     vendor_id, donor_id, confidence, status
       contracts: vendor_id, amount, award_date, awarding_agency
-      donations: donor_id, amount, date, recipient_office
+      donors:    {donor_id: {donation_total: float,
+                             donation_dates: list[date],
+                             offices: list[str]}}  -- pre-aggregated donor entities
+
+    A donor may have given to several offices; control weight takes the best
+    (most controlling) office for the awarding agency, so the score reflects the
+    strongest real control relationship rather than an arbitrary modal office.
     """
     agency_map = agency_map if agency_map is not None else load_agency_map()
     out = []
     c_by_v = contracts.groupby("vendor_id")
-    d_by_d = donations.groupby("donor_id")
 
     for _, link in links.iterrows():
+        donor = donors.get(link["donor_id"])
+        if donor is None:
+            continue
         try:
             cv = c_by_v.get_group(link["vendor_id"])
-            dd = d_by_d.get_group(link["donor_id"])
         except KeyError:
             continue
+        contract_total = float(cv["amount"].sum())
         agency = cv["awarding_agency"].mode().iat[0] if not cv.empty else ""
-        office = dd["recipient_office"].mode().iat[0] if not dd.empty else ""
-        scored = score_relationship(
-            contract_total=float(cv["amount"].sum()),
-            donation_total=float(dd["amount"].sum()),
-            confidence=float(link["confidence"]),
-            agency=agency,
-            recipient_office=office,
-            award_dates=list(pd.to_datetime(cv["award_date"]).dt.date),
-            donation_dates=list(pd.to_datetime(dd["date"]).dt.date),
-            agency_map=agency_map,
-        )
+        award_dates = list(pd.to_datetime(cv["award_date"]).dt.date)
+
+        best = None
+        for office in donor["offices"] or [""]:
+            scored = score_relationship(
+                contract_total=contract_total,
+                donation_total=donor["donation_total"],
+                confidence=float(link["confidence"]),
+                agency=agency,
+                recipient_office=office,
+                award_dates=award_dates,
+                donation_dates=donor["donation_dates"],
+                agency_map=agency_map,
+            )
+            if best is None or scored["score"] > best["score"]:
+                best = scored
+
         out.append(
             {
                 "vendor_id": link["vendor_id"],
                 "donor_id": link["donor_id"],
-                "contract_total": float(cv["amount"].sum()),
-                "donation_total": float(dd["amount"].sum()),
-                "concern_score": scored["score"],
-                **scored["components"],
+                "contract_total": contract_total,
+                "donation_total": donor["donation_total"],
+                "concern_score": best["score"],
+                **best["components"],
                 "confidence": link["confidence"],
                 "status": link["status"],
             }
