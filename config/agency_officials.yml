@@ -1,0 +1,38 @@
+# Maps an awarding agency (as it appears in LaTrac) to the statewide official,
+# board, or commission that controls its contracts. This is what turns
+# "a payment from agency X" into "money the people a donor gave to can steer."
+#
+# control: "direct"  -> the official directly awards/approves these contracts
+#          "board"   -> a board the official appoints/chairs controls them
+#          "budget"  -> the official influences via budget/appropriations
+#
+# Start with the highest-spend agencies and expand. Names must match the
+# `awarding_agency` values produced by ingest/contracts_latrac.py.
+
+agencies:
+  - agency: "Department of Transportation and Development"
+    aliases: ["DOTD", "Transportation and Development"]
+    officials:
+      - name: "Governor"
+        office: "Governor of Louisiana"
+        control: "budget"
+
+  - agency: "Division of Administration"
+    aliases: ["DOA"]
+    officials:
+      - name: "Commissioner of Administration"
+        office: "Commissioner of Administration"
+        control: "direct"
+      - name: "Governor"
+        office: "Governor of Louisiana"
+        control: "budget"
+
+  - agency: "Department of Health"
+    aliases: ["LDH", "Health and Hospitals", "DHH"]
+    officials:
+      - name: "Governor"
+        office: "Governor of Louisiana"
+        control: "budget"
+
+# TODO: extend with the top ~30 agencies by total contract spend.
+# Pull the agency list from data/raw/contracts.parquet after first ingest.
