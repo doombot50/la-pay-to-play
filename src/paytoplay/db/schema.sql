@@ -10,12 +10,9 @@ CREATE TABLE vendors (
     contract_count  INTEGER DEFAULT 0
 );
 
+-- Officials live in config/agency_officials.yml, not the DB; drop any table
+-- left behind by older builds.
 DROP TABLE IF EXISTS officials;
-CREATE TABLE officials (
-    id      TEXT PRIMARY KEY,
-    name    TEXT NOT NULL,
-    office  TEXT
-);
 
 DROP TABLE IF EXISTS contracts;
 CREATE TABLE contracts (
@@ -40,9 +37,9 @@ CREATE TABLE donations (
     donation_count    INTEGER,
     date_first        TEXT,
     date_last         TEXT,
-    recipient_name    TEXT,    -- most frequent recipient (display)
+    recipient_name    TEXT,    -- first non-empty recipient (display only)
     recipient_filer   TEXT,
-    recipient_office  TEXT,    -- most frequent non-empty office (display)
+    recipient_office  TEXT,    -- first non-empty office (display only)
     source_url        TEXT
 );
 
@@ -62,7 +59,7 @@ CREATE TABLE links (
     timing_weight    REAL,
     match_confidence REAL,
     control_office   TEXT,           -- office that drove the control weight
-    agency           TEXT,           -- vendor's awarding agency (modal)
+    agency           TEXT,           -- awarding agency of the scored relationship
     PRIMARY KEY (vendor_id, donor_id)
 );
 

@@ -13,26 +13,42 @@ from __future__ import annotations
 import pandas as pd
 from rapidfuzz import fuzz
 
-from ..config import PUBLISH_CONFIDENCE, REVIEW_CONFIDENCE
+from ..config import PUBLISH_CONFIDENCE, REVIEW_CONFIDENCE, SUBSET_CONFIDENCE_CAP
 from ..normalize import names
 
 
 def _name_similarity(a: str, b: str) -> float:
-    """0-1 token-set similarity, robust to word order and corporate filler."""
+    """0-1 token-set similarity, robust to word order and corporate filler.
+
+    token_set_ratio returns 1.0 for ANY strict token-subset pair ("gulf coast"
+    vs "gulf coast bank"), which would let name-prefix collisions between
+    different entities sail past the publish threshold untested. Strict subsets
+    are capped at SUBSET_CONFIDENCE_CAP so they can only ever reach review.
+    """
     ka, kb = names.name_key(a), names.name_key(b)
     if not ka or not kb:
         return 0.0
-    return fuzz.token_set_ratio(ka, kb) / 100.0
+    sim = fuzz.token_set_ratio(ka, kb) / 100.0
+    ta, tb = set(ka.split()), set(kb.split())
+    if ta != tb and (ta <= tb or tb <= ta):
+        sim = min(sim, SUBSET_CONFIDENCE_CAP)
+    return sim
 
 
 def _eponymous(vendor_name: str, person_name: str) -> bool:
     """True when a person donor's full name is embedded in the vendor name —
     e.g. donor 'Gordon McKernan' in vendor 'Gordon McKernan Injury Attorneys'.
     This is the only org<->person link we trust enough to publish, because we
-    have no employer field to tie a person to a company they merely work for."""
-    ptoks = [t for t in names.clean(person_name).split() if len(t) > 1]
-    vtoks = set(names.clean(vendor_name).split())
-    return len(ptoks) >= 2 and all(t in vtoks for t in ptoks)
+    have no employer field to tie a person to a company they merely work for.
+
+    Nicknames are folded on both sides ('Bob Smith' matches 'Robert Smith
+    Construction'), and generic/geographic tokens are rejected so two-word
+    org-ish donors ('Gulf Coast') can't pose as an embedded person name."""
+    ptoks = [t for t in names.person_key(person_name).split() if len(t) > 1]
+    if len(ptoks) < 2 or any(t in names.GENERIC_PERSON_TOKENS for t in ptoks):
+        return False
+    vtoks = set(names.nick_fold(names.clean(vendor_name).split()))
+    return all(t in vtoks for t in ptoks)
 
 
 def _lane_and_confidence(vendor: dict, donor: dict) -> tuple[str, float]:

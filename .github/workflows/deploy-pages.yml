@@ -29,7 +29,25 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install -r requirements.txt && pip install -e .
+      - run: pip install -r requirements-dev.txt && pip install -e .
+
+      # Never deploy from a broken tree.
+      - run: pytest -q
+
+      # Runners start empty; without a cache every weekly run re-downloads
+      # years of PDFs from checkbook.la.gov. Keyed by month so the saved cache
+      # rolls forward (the ingest itself always re-fetches the current and
+      # previous month).
+      - name: Compute cache key
+        id: month
+        run: echo "month=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
+      - name: Cache Act 87 PDFs
+        uses: actions/cache@v4
+        with:
+          path: data/raw/act87_pdfs
+          key: act87-pdfs-${{ steps.month.outputs.month }}
+          restore-keys: |
+            act87-pdfs-
 
       # Donations: published by the CF repo as a release asset (the flat-file
       # handoff). Public asset, no auth needed.
@@ -50,6 +68,25 @@ jobs:
           python -m paytoplay.build_site
           echo "p2p.charliestephens.xyz" > web/CNAME
           touch web/.nojekyll
+
+      # A source-format change upstream (PDF layout, CSV columns) tends to fail
+      # SILENTLY as an empty dataset. Refuse to publish a suspiciously small site.
+      - name: Sanity-check the built site
+        run: |
+          python - <<'EOF'
+          import json, sys
+          meta = json.load(open("web/data/meta.json"))
+          counts = meta["counts"]
+          problems = []
+          if counts["contracts_total"] < 5000:
+              problems.append(f"only {counts['contracts_total']} contracts (expected >= 5000)")
+          if counts["published_links"] < 1:
+              problems.append("zero published links")
+          if problems:
+              sys.exit("refusing to deploy: " + "; ".join(problems))
+          print(f"ok: {counts['contracts_total']} contracts, "
+                f"{counts['published_links']} published links")
+          EOF
 
       - uses: actions/upload-pages-artifact@v3
         with:

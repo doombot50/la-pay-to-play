@@ -95,7 +95,9 @@ controlling office), SQLite load, `build_site.py` static artifacts, and the
 
 **Reputational firewall:** only strong org↔org matches (confidence ≥ 0.92) with
 material money on both sides are published; everything else is review-only and
-never reaches the site. Matching is **name-based** (the Ethics export has no
+never reaches the site. Name-prefix (token-subset) matches — "Gulf Coast" vs
+"Gulf Coast Bank" — are capped below the publish bar and can only ever reach
+the review queue. Matching is **name-based** (the Ethics export has no
 employer/address; contract reports have no vendor address), so the person lane
 only fires for eponymous vendors. Recipient office is backfilled by filer number
 (~27% coverage; statewide constitutional officers are well covered).

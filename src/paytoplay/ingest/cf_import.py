@@ -83,8 +83,10 @@ def main(argv: list[str] | None = None) -> None:
     try:
         write(load())
     except FileNotFoundError as e:
-        print(e)
-        sys.exit(0)
+        # Fail loudly: in CI a missing export must stop the run here, not let a
+        # later stage fail confusingly (or run against stale data).
+        print(e, file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

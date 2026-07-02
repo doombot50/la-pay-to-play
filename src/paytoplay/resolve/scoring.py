@@ -21,7 +21,7 @@ def _money_weight(contract_total: float, donation_total: float) -> float:
     if contract_total <= 0 or donation_total <= 0:
         return 0.0
     smaller = min(contract_total, donation_total)
-    # ~$1k -> 0.3, ~$50k -> 0.65, ~$1M -> ~1.0
+    # ~$1k -> 0.5, ~$50k -> ~0.78, >= $1M -> 1.0
     return min(1.0, math.log10(smaller + 1) / 6.0)
 
 
@@ -88,11 +88,15 @@ def score_links(
       contracts: vendor_id, amount, award_date, awarding_agency
       donors:    {donor_id: {donation_total: float,
                              donation_dates: list[date],
+                             office_totals: {office: float},
+                             office_dates: {office: list[date]},
                              offices: list[str]}}  -- pre-aggregated donor entities
 
-    A donor may have given to several offices; control weight takes the best
-    (most controlling) office for the awarding agency, so the score reflects the
-    strongest real control relationship rather than an arbitrary modal office.
+    Scoring runs per (awarding agency, recipient office) pair and keeps the
+    strongest combination: contract money, award dates and donation money/dates
+    are all restricted to that pair, so a vendor's unrelated contracts (or a
+    donor's gifts to unrelated races) can't inflate the score of a specific
+    control relationship.
     """
     agency_map = agency_map if agency_map is not None else load_agency_map()
     out = []
@@ -106,40 +110,46 @@ def score_links(
             cv = c_by_v.get_group(link["vendor_id"])
         except KeyError:
             continue
-        contract_total = float(cv["amount"].sum())
-        agency = cv["awarding_agency"].mode().iat[0] if not cv.empty else ""
-        award_dates = [d for d in pd.to_datetime(cv["award_date"], errors="coerce").dt.date
-                       if pd.notna(d)]
+        cv = cv.assign(_award=pd.to_datetime(cv["award_date"], errors="coerce"))
 
         best = None
         best_office = ""
+        best_agency = ""
+        best_contract_total = 0.0
         office_totals = donor.get("office_totals", {})
-        for office in donor["offices"] or [""]:
-            scored = score_relationship(
-                contract_total=contract_total,
-                donation_total=office_totals.get(office, donor["donation_total"]),
-                confidence=float(link["confidence"]),
-                agency=agency,
-                recipient_office=office,
-                award_dates=award_dates,
-                donation_dates=donor["donation_dates"],
-                agency_map=agency_map,
-            )
-            if best is None or scored["score"] > best["score"]:
-                best, best_office = scored, office
+        office_dates = donor.get("office_dates", {})
+        for agency, cg in cv.groupby("awarding_agency"):
+            contract_total = float(cg["amount"].sum())
+            award_dates = [d.date() for d in cg["_award"].dropna()]
+            for office in donor["offices"] or [""]:
+                scored = score_relationship(
+                    contract_total=contract_total,
+                    donation_total=office_totals.get(office, donor["donation_total"]),
+                    confidence=float(link["confidence"]),
+                    agency=agency,
+                    recipient_office=office,
+                    award_dates=award_dates,
+                    donation_dates=office_dates.get(office, donor["donation_dates"]),
+                    agency_map=agency_map,
+                )
+                if best is None or scored["score"] > best["score"]:
+                    best, best_office = scored, office
+                    best_agency, best_contract_total = agency, contract_total
 
+        if best is None:
+            continue
         out.append(
             {
                 "vendor_id": link["vendor_id"],
                 "donor_id": link["donor_id"],
-                "contract_total": contract_total,
+                "contract_total": best_contract_total,
                 "donation_total": office_totals.get(best_office, donor["donation_total"]),
                 "concern_score": best["score"],
                 **best["components"],
                 # Only name an office when it actually controls the agency; a 0
                 # control weight means no real relationship — don't fabricate one.
                 "control_office": best_office if best["components"]["control_weight"] > 0 else "",
-                "agency": agency,
+                "agency": best_agency,
                 "confidence": link["confidence"],
                 "status": link["status"],
             }

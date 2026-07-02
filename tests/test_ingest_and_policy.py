@@ -28,6 +28,14 @@ _SEP_ROW = ["1", "01-100", "Office of the Governor", "2000919792", "", "Beta Inc
             "", "", "", "", "", "$50,000.00", "purpose", "Non-Discretionary"]
 
 
+def test_prev_month_rolls_the_year_in_january():
+    from datetime import date
+    # The old inline expression yielded (2026, 12) in January 2026, so the
+    # current month's report was never treated as refreshable.
+    assert c87._prev_month(date(2026, 1, 15)) == (2025, 12)
+    assert c87._prev_month(date(2026, 7, 2)) == (2026, 6)
+
+
 def test_money_and_date_parsing():
     assert c87._money("$50,000.00") == 50000.0
     assert c87._money("") == 0.0

@@ -60,6 +60,23 @@ for _grp in _NICK_GROUPS:
     for _f in _forms:
         _NICK[_f] = _forms[0]
 
+# Tokens that pass the 2-3-token person-shape test but are far more likely to
+# be a generic / geographic business name ("Gulf Coast", "Crescent City") than
+# a human's name. Used to keep the eponymous org<->person publish gate from
+# firing on name-prefix collisions between unrelated companies.
+GENERIC_PERSON_TOKENS = {
+    "louisiana", "gulf", "coast", "coastal", "bayou", "delta", "acadiana",
+    "north", "south", "east", "west", "northern", "southern", "eastern",
+    "western", "central", "river", "lake", "city", "state", "capital",
+    "crescent", "pelican", "cajun", "creole", "parish", "united", "american",
+    "national", "global", "premier", "quality", "first", "family",
+}
+
+
+def nick_fold(toks: list[str]) -> list[str]:
+    """Fold nickname forms to their canonical root ('bob' -> 'robert')."""
+    return [_NICK.get(t, t) for t in toks]
+
 
 def clean(name: str | None) -> str:
     """Lowercase, strip punctuation and collapse whitespace."""
@@ -97,8 +114,7 @@ def person_key(name: str | None) -> str:
 
     'Bob Smith', 'Smith, Robert' and 'Mr. Robert Smith' all -> 'robert smith'.
     """
-    toks = [t for t in clean(name).split() if t not in _HONORIFICS]
-    toks = [_NICK.get(t, t) for t in toks]
+    toks = nick_fold([t for t in clean(name).split() if t not in _HONORIFICS])
     if not toks:
         return clean(name)
     return " ".join(sorted(toks))
