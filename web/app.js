@@ -94,14 +94,15 @@ async function renderVendor(id) {
     <a class="back" href="#/">← Leaderboard</a>
     ${disclaimerBar(v.disclaimer)}
     <h1 class="page">${esc(v.company)}</h1>
-    <p class="lede">Holds <b>${moneyFull(v.contract_total)}</b> in state contracts and donated
+    <p class="lede">Holds <b>${moneyFull(v.contract_total)}</b> in contracts from
+      <b>${esc(v.agency || 'the awarding agency')}</b> and donated
       <b>${moneyFull(v.donation_total)}</b> to campaigns for <b>${esc(officeLabel(v.office))}</b>,
-      which helps control <b>${esc(v.agency || 'the awarding agency')}</b>.</p>
+      which helps control that agency.</p>
     <div class="section-h">The money chain</div>
     ${chainCard(v)}
     <div class="section-h">Concern score · ${Math.round(v.concern_score)}/100</div>
     ${components(v.components)}
-    <div class="section-h">State contracts (${v.contracts.length})</div>
+    <div class="section-h">State contracts (${v.contracts.length}, all agencies)</div>
     ${tableContracts(v.contracts)}
     <div class="section-h">Campaign donations (top ${v.gifts.length})</div>
     ${tableGifts(v.gifts)}`;

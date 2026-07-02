@@ -65,7 +65,10 @@ Only within-block pairs get the expensive fuzzy comparison.
 
 ## Concern score (transparent by design)
 
-`resolve/scoring.py` computes a 0–100 score per (vendor, official) link from:
+`resolve/scoring.py` computes a 0–100 score per (vendor, awarding agency,
+office) combination and keeps the strongest one per link. Money and dates are
+restricted to that combination — a vendor's contracts from unrelated agencies,
+or a donor's gifts to unrelated races, never inflate the score. Components:
 
 - **money weight** — log-scaled min(contract $, donation $); both sides must be material.
 - **control weight** — does the donation recipient actually control the awarding

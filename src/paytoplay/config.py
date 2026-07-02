@@ -26,6 +26,12 @@ MATCH_MIN_SCORE = 82
 # REVIEW_CONFIDENCE up to here is kept as status="review" and never published.
 PUBLISH_CONFIDENCE = 0.92
 REVIEW_CONFIDENCE = 0.55
+# rapidfuzz token_set_ratio scores ANY strict token-subset pair 1.0 ("Gulf
+# Coast" vs "Gulf Coast Bank"), and different entities routinely share a name
+# prefix. Subset-only matches are therefore capped here — below the publish
+# bar, above the review floor — so they land in the review queue, never on the
+# public site. Must stay < PUBLISH_CONFIDENCE.
+SUBSET_CONFIDENCE_CAP = 0.90
 # Materiality gate (enforced when building the public site): both sides must
 # clear these or the link is held back — a tiny donation next to a tiny contract
 # is noise, not a pay-to-play signal.

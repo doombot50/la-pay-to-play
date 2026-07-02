@@ -70,6 +70,11 @@ def _iso_date(cell) -> str:
     return ""
 
 
+def _prev_month(today: date) -> tuple[int, int]:
+    """(year, month) of the calendar month before `today`, rolling the year."""
+    return (today.year, today.month - 1) if today.month > 1 else (today.year - 1, 12)
+
+
 def _month_range(since_year: int):
     y, m = FIRST
     if since_year > y:
@@ -88,7 +93,9 @@ def download(year: int, month: int, force: bool) -> tuple[str, str] | None:
     PDF_DIR.mkdir(parents=True, exist_ok=True)
     url = URL.format(year=year, month=month)
     dest = PDF_DIR / f"{year}_{month:02d}.pdf"
-    is_current = (year, month) >= (date.today().year, date.today().month - 1 or 12)
+    # The current and previous month's reports still receive amendments, so
+    # they are always re-fetched even when a cached copy exists.
+    is_current = (year, month) >= _prev_month(date.today())
     if dest.exists() and not force and not is_current:
         return str(dest), url
     try:

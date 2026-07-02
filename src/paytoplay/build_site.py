@@ -141,6 +141,9 @@ def build() -> None:
         ]
         link_donor_id = links[links["vendor_id"] == vid].iloc[0]["donor_id"]
         dent = dons.loc[link_donor_id] if link_donor_id in dons.index else None
+        # The link's money figures are agency-specific, so the count shown next
+        # to them must be too; the contracts table still lists every agency.
+        agency_count = 0 if cg is None else int((cg["awarding_agency"] == row["agency"]).sum())
         _write(SITE / "vendor" / f"{vid}.json", {
             "vendor_id": vid,
             "company": row["company"],
@@ -150,7 +153,7 @@ def build() -> None:
             "components": row["components"],
             "contract_total": row["contract_total"],
             "donation_total": row["donation_total"],
-            "contract_count": int(vendors.loc[vid]["contract_count"]) if vid in vendors.index else len(contract_list),
+            "contract_count": agency_count or len(contract_list),
             "donation_count": int(dent["donation_count"]) if dent is not None else 0,
             "contracts": contract_list,
             "gifts": gift_detail.get(link_donor_id, []),
