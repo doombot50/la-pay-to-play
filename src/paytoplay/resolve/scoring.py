@@ -15,6 +15,15 @@ from ..config import TIMING_WINDOW_DAYS, load_agency_map
 
 _CONTROL_WEIGHT = {"direct": 1.0, "board": 0.7, "budget": 0.5}
 
+# Declared so an empty result still carries its columns: pipeline.run() merges
+# this frame onto `links` by (vendor_id, donor_id), and a column-less empty
+# DataFrame makes that merge raise KeyError instead of yielding empty scores.
+SCORED_COLUMNS = [
+    "vendor_id", "donor_id", "contract_total", "donation_total", "concern_score",
+    "money_weight", "control_weight", "timing_weight", "match_confidence",
+    "control_office", "agency", "confidence", "status",
+]
+
 
 def _money_weight(contract_total: float, donation_total: float) -> float:
     """Both sides must be material. Log-scaled, 0-1."""
@@ -154,4 +163,4 @@ def score_links(
                 "status": link["status"],
             }
         )
-    return pd.DataFrame(out)
+    return pd.DataFrame(out, columns=SCORED_COLUMNS)

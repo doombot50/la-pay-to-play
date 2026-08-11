@@ -64,6 +64,20 @@ def test_timing_uses_only_gifts_to_the_scored_office():
     assert out.iloc[0]["timing_weight"] == 0.0
 
 
+def test_empty_result_keeps_its_columns():
+    # pipeline.run() merges this frame onto `links` by (vendor_id, donor_id).
+    # A column-less empty frame — which happens whenever nothing scores, e.g. an
+    # empty contracts ingest — made that merge raise KeyError.
+    contracts = pd.DataFrame(columns=["vendor_id", "amount", "award_date", "awarding_agency"])
+    out = scoring.score_links(_link(), contracts, _donor(), agency_map=AG_MAP)
+    assert out.empty
+    links = _link()
+    merged = links.merge(out.drop(columns=["confidence", "status"], errors="ignore"),
+                         on=["vendor_id", "donor_id"], how="left")
+    assert len(merged) == 1
+    assert pd.isna(merged.iloc[0]["concern_score"])
+
+
 def test_money_weight_reference_points():
     assert abs(scoring._money_weight(1_000_000, 999) - 0.5) < 0.01   # ~$1k -> 0.5
     assert scoring._money_weight(1_000_000, 1_000_000) == 1.0        # $1M -> 1.0
