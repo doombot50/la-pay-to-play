@@ -23,6 +23,7 @@ Run:
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from datetime import date
@@ -87,6 +88,20 @@ def _month_range(since_year: int):
             y, m = y + 1, 1
 
 
+def _cached(dest, url: str, year: int, month: int) -> tuple[str, str] | None:
+    """Fall back to an already-downloaded copy after a failed re-fetch.
+
+    Only the current and previous month are re-fetched, so without this a single
+    transient error (timeout, 5xx, a changed URL) silently DROPPED that month's
+    contracts from the output even though a good PDF sat in the cache.
+    """
+    if dest.exists():
+        print(f"  {year}-{month:02d}: re-fetch failed, using cached copy",
+              file=sys.stderr)
+        return str(dest), url
+    return None
+
+
 def download(year: int, month: int, force: bool) -> tuple[str, str] | None:
     """Return (local_pdf_path, source_url) or None if the month has no report."""
     ensure_dirs()
@@ -102,13 +117,20 @@ def download(year: int, month: int, force: bool) -> tuple[str, str] | None:
         r = requests.get(url, headers=_UA, timeout=60)
     except requests.RequestException as e:
         print(f"  {year}-{month:02d}: fetch error ({e})", file=sys.stderr)
-        return None
+        return _cached(dest, url, year, month)
     if r.status_code == 404:
-        return None
+        # Normal for a month whose report isn't published yet (no cache, no
+        # message); suspicious for one we already have, so keep that copy.
+        return _cached(dest, url, year, month)
     if r.status_code != 200 or not r.content.startswith(b"%PDF"):
         print(f"  {year}-{month:02d}: HTTP {r.status_code}, not a PDF", file=sys.stderr)
-        return None
-    dest.write_bytes(r.content)
+        return _cached(dest, url, year, month)
+    # Write via a temp file: a process killed mid-write used to leave a
+    # truncated PDF in the cache, which then failed to parse on every later run
+    # (silently losing that month, since parse errors are skipped).
+    tmp = dest.with_name(dest.name + ".part")
+    tmp.write_bytes(r.content)
+    os.replace(tmp, dest)
     return str(dest), url
 
 
@@ -247,6 +269,12 @@ def main(argv: list[str] | None = None) -> None:
         print(f"  {y}-{m:02d}: {len(rows):,} contract rows")
 
     df = _dedupe(all_rows)
+    if df.empty:
+        # Writing the empty frame would clobber the last good contracts.parquet
+        # and let the pipeline run to completion on nothing.
+        print(f"\nERROR: {ok} months parsed, {missing} missing, 0 contract rows. "
+              f"Refusing to overwrite {CONTRACTS_PARQUET}.", file=sys.stderr)
+        sys.exit(1)
     ensure_dirs()
     df.to_parquet(CONTRACTS_PARQUET, index=False)
     print(f"\n{ok} months parsed, {missing} missing; "
