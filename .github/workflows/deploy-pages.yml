@@ -51,11 +51,39 @@ jobs:
 
       # Donations: published by the CF repo as a release asset (the flat-file
       # handoff). Public asset, no auth needed.
+      #
+      # Three ways this handoff fails quietly, each guarded below:
+      #   HTTP flake      -> curl retries, then fails the build (never a partial file)
+      #   truncated .gz   -> gzip -t before we trust it
+      #   stale asset     -> the producer's publish step is continue-on-error, so a
+      #                      weeks-old asset stays downloadable and would ship as new;
+      #                      Last-Modified is checked against MAX_AGE_DAYS.
+      # Schema drift and an empty/zero-money export are caught in cf_import itself.
       - name: Fetch CF donations export
+        env:
+          CF_URL: https://github.com/doombot50/la-campaign-finance/releases/download/data-cache/cf_donations.csv.gz
+          HDRS: ${{ runner.temp }}/cf_headers.txt
+          MAX_AGE_DAYS: "14"      # producer republishes nightly
         run: |
-          set -e
-          curl -fsSL -o data/external/cf_donations.csv.gz \
-            https://github.com/doombot50/la-campaign-finance/releases/download/data-cache/cf_donations.csv.gz
+          set -eo pipefail
+          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
+            -D "$HDRS" -o data/external/cf_donations.csv.gz "$CF_URL"
+          gzip -t data/external/cf_donations.csv.gz
+          python - <<'EOF'
+          import datetime, email.utils, os, sys
+          with open(os.environ["HDRS"], encoding="utf-8", errors="replace") as fh:
+              hdrs = fh.read().splitlines()
+          lines = [l for l in hdrs if l.lower().startswith("last-modified:")]
+          if not lines:
+              print("note: no Last-Modified header; skipping the staleness check")
+              sys.exit(0)
+          published = email.utils.parsedate_to_datetime(lines[-1].split(":", 1)[1].strip())
+          age = (datetime.datetime.now(datetime.timezone.utc) - published).days
+          print(f"cf_donations.csv.gz published {published.isoformat()} ({age} days old)")
+          if age > int(os.environ["MAX_AGE_DAYS"]):
+              sys.exit(f"refusing to build: CF donations export is {age} days old — the "
+                       "upstream la-campaign-finance publish step is failing")
+          EOF
           gunzip -f data/external/cf_donations.csv.gz
           python -m paytoplay.ingest.cf_import
 
